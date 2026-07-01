@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>配布資料ダウンロード</title>
+<style>
+  /* ===== 設定はこの下の <script> の CONFIG を編集 ===== */
+  :root{
+    --bg:#FBFBF9;
+    --surface:#FFFFFF;
+    --ink:#1A1A17;
+    --muted:#6B6B63;
+    --accent:#0B6E5A;
+    --accent-soft:#E7F1EC;
+    --border:#E8E8E1;
+    --radius:14px;
+    --maxw:640px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    padding:24px 18px 64px;
+  }
+  .wrap{max-width:var(--maxw);margin:0 auto;}
+
+  header{padding:12px 2px 22px;border-bottom:1px solid var(--border);margin-bottom:18px;}
+  .eyebrow{
+    display:inline-block;font-size:12px;letter-spacing:.14em;font-weight:700;
+    color:var(--accent);background:var(--accent-soft);
+    padding:4px 10px;border-radius:999px;margin-bottom:12px;
+  }
+  h1{font-size:22px;font-weight:800;margin:0 0 6px;letter-spacing:.01em;}
+  .subtitle{color:var(--muted);font-size:14px;margin:0;}
+  .count{font-size:13px;color:var(--muted);margin-top:10px;}
+
+  ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;}
+  .card{
+    display:flex;align-items:center;gap:14px;
+    background:var(--surface);border:1px solid var(--border);
+    border-left:3px solid var(--accent);
+    border-radius:var(--radius);padding:14px 16px;
+  }
+  .icon{
+    flex:0 0 auto;width:40px;height:40px;border-radius:10px;
+    background:var(--accent-soft);display:grid;place-items:center;
+    color:var(--accent);font-size:11px;font-weight:800;letter-spacing:.02em;
+  }
+  .meta{flex:1 1 auto;min-width:0;}
+  .fname{font-size:15px;font-weight:700;word-break:break-word;margin:0 0 2px;}
+  .fsize{font-size:12px;color:var(--muted);font-family:ui-monospace,"SF Mono",Menlo,monospace;}
+  .btn{
+    flex:0 0 auto;
+    appearance:none;border:none;cursor:pointer;
+    background:var(--accent);color:#fff;
+    font-size:14px;font-weight:700;font-family:inherit;
+    padding:11px 16px;border-radius:10px;min-height:44px;min-width:96px;
+    transition:transform .08s ease,opacity .15s ease;
+  }
+  .btn:hover{opacity:.92;}
+  .btn:active{transform:scale(.97);}
+  .btn:disabled{opacity:.55;cursor:default;}
+  .btn:focus-visible{outline:3px solid var(--accent-soft);outline-offset:2px;}
+
+  .state{
+    text-align:center;color:var(--muted);font-size:14px;
+    padding:40px 12px;border:1px dashed var(--border);border-radius:var(--radius);
+  }
+  .state.err{color:#9a3b2f;border-color:#e6c4bd;background:#fbf1ef;}
+  .spin{
+    display:inline-block;width:18px;height:18px;margin-right:8px;vertical-align:-3px;
+    border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  footer{margin-top:26px;color:var(--muted);font-size:12px;text-align:center;line-height:1.7;}
+
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important;}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <span class="eyebrow" id="eyebrow">配布資料</span>
+      <h1 id="pageTitle">資料ダウンロード</h1>
+      <p class="subtitle" id="pageSubtitle">下のボタンから各ファイルを保存できます。</p>
+      <p class="count" id="count"></p>
+    </header>
+
+    <ul id="list"></ul>
+    <div class="state" id="loading"><span class="spin"></span>ファイルを読み込み中…</div>
+
+    <footer id="footer"></footer>
+  </div>
+
+<script>
+  /* ============================================================
+     ここだけ編集すればOK
+     ============================================================ */
+  const CONFIG = {
+    OWNER:  "Xiaoli0306",            // ← GitHubのユーザー名
+    REPO:   "PhyChem_PastExam",      // ← リポジトリ名
+    BRANCH: "main",                  // ← 通常 main
+    DIR:    "",                      // ← PDFを入れたフォルダ名。ルート直下なら "" のまま
+    PAGE_TITLE:    "物理化学 過去問",   // ← ページ見出し（好きに変えてOK）
+    PAGE_SUBTITLE: "下のボタンから各ファイルを保存できます。",
+    EYEBROW:       "配布資料",
+    FOOTER:        ""                // ← 補足文（任意）。空なら非表示
+  };
+  /* ============================================================ */
+
+  const $ = (id) => document.getElementById(id);
+  $("pageTitle").textContent = CONFIG.PAGE_TITLE;
+  $("pageSubtitle").textContent = CONFIG.PAGE_SUBTITLE;
+  $("eyebrow").textContent = CONFIG.EYEBROW;
+  if (CONFIG.FOOTER) $("footer").textContent = CONFIG.FOOTER;
+
+  function fmtSize(bytes){
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024*1024) return (bytes/1024).toFixed(0) + " KB";
+    return (bytes/1024/1024).toFixed(1) + " MB";
+  }
+
+  async function downloadFile(url, filename, btn){
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = "取得中…";
+    try{
+      const res = await fetch(url);
+      if(!res.ok) throw new Error(res.status);
+      const blob = await res.blob();
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objUrl; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(objUrl), 2000);
+      btn.textContent = "完了";
+    }catch(e){
+      // 直リンクにフォールバック（ブラウザでPDFが開く）
+      window.open(url, "_blank", "noopener");
+      btn.textContent = orig;
+    }finally{
+      setTimeout(()=>{ btn.textContent = "ダウンロード"; btn.disabled = false; }, 1600);
+    }
+  }
+
+  async function load(){
+    const path = CONFIG.DIR ? CONFIG.DIR.replace(/^\/|\/$/g,"") : "";
+    const api = `https://api.github.com/repos/${CONFIG.OWNER}/${CONFIG.REPO}/contents/${path}?ref=${CONFIG.BRANCH}`;
+    try{
+      const res = await fetch(api, {headers:{Accept:"application/vnd.github+json"}});
+      if(!res.ok) throw new Error("API " + res.status);
+      const items = await res.json();
+      const pdfs = (Array.isArray(items) ? items : [])
+        .filter(f => f.type === "file" && /\.pdf$/i.test(f.name))
+        .sort((a,b) => a.name.localeCompare(b.name, "ja"));
+
+      $("loading").style.display = "none";
+
+      if(pdfs.length === 0){
+        const empty = document.createElement("div");
+        empty.className = "state";
+        empty.textContent = "まだPDFがありません。リポジトリにファイルを追加してください。";
+        $("list").after(empty);
+        return;
+      }
+
+      $("count").textContent = `全 ${pdfs.length} 件`;
+      const list = $("list");
+      for(const f of pdfs){
+        const li = document.createElement("li");
+        li.className = "card";
+        li.innerHTML = `
+          <div class="icon">PDF</div>
+          <div class="meta">
+            <p class="fname"></p>
+            <span class="fsize"></span>
+          </div>
+          <button class="btn">ダウンロード</button>`;
+        li.querySelector(".fname").textContent = f.name;
+        li.querySelector(".fsize").textContent = fmtSize(f.size);
+        li.querySelector(".btn").addEventListener("click", (ev)=>{
+          downloadFile(f.download_url, f.name, ev.currentTarget);
+        });
+        list.appendChild(li);
+      }
+    }catch(e){
+      $("loading").style.display = "none";
+      const err = document.createElement("div");
+      err.className = "state err";
+      err.textContent = "読み込みに失敗しました。設定（ユーザー名・リポジトリ名）とリポジトリの公開設定を確認してください。";
+      $("list").after(err);
+    }
+  }
+  load();
+</script>
+</body>
+</html>
